@@ -10,33 +10,18 @@ pub struct Arguments {
 }
 
 struct Argument {
-    value: String,
     description: String,
     argument_function: fn(&str) -> Result<Argument, Box<dyn Error>>,
 }
 
 impl Arguments {
     pub fn parse(args: &Vec<String>) -> Result<Self, Box<dyn Error>> {
-        let mut mode;
-        let mut address;
-        let mut port;
-        let arg_options = Self::options();
+        let mut arg_options = Self::options();
         for arg in args {
             let (key, value) = Self::split_argument(arg);
-            match key.as_ref() {
-                "mode" => {
-                    mode = String::from(value);
-                }
-                "address" => {
-                    address = value.parse::<IpAddr>()?;
-                }
-                "port" => {
-                    port = value.parse::<u16>()?;
-                }
-                _ => {
-                    Self::help();
-                    Err("Option does not exists")?
-                }
+            if arg_options.contains_key(&key) {
+                let func = arg_options.get(&key).unwrap().argument_function;
+                func(&value)?;
             }
         }
         Err("Not Implemented")?
@@ -63,7 +48,6 @@ impl Arguments {
         options.insert(
             String::from("mode"),
             Argument {
-                value: String::from(""),
                 description: String::from("Help text"),
                 argument_function: Self::parse_mode,
             },
@@ -71,7 +55,6 @@ impl Arguments {
         options.insert(
             String::from("address"),
             Argument {
-                value: String::from(""),
                 description: String::from("Help text"),
                 argument_function: Self::parse_address,
             },
@@ -79,7 +62,6 @@ impl Arguments {
         options.insert(
             String::from("port"),
             Argument {
-                value: String::from(""),
                 description: String::from("Help text"),
                 argument_function: Self::parse_port,
             },
