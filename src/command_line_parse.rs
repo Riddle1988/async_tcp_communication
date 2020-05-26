@@ -1,62 +1,102 @@
 use async_std::net::{IpAddr, Ipv4Addr};
 use std::collections::HashMap;
-use std::process;
+use std::error::Error;
 
 #[derive(Debug)]
-pub struct ParsedArguments {
-    mode: String,
-    address: async_std::net::IpAddr,
-    port: u16,
+pub struct Arguments {
+    pub mode: String,
+    pub address: async_std::net::IpAddr,
+    pub port: u16,
 }
 
-impl ParsedArguments {
-    pub fn parse(args: &Vec<String>) -> Self {
-        let mut mode = String::from("");
-        let mut address = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-        let mut port = 0;
-        let arg_map = Self::separate(args);
+struct Argument {
+    value: String,
+    description: String,
+    argument_function: fn(&str) -> Result<Argument, Box<dyn Error>>,
+}
 
-        for (key, value) in arg_map.iter() {
-            match *key {
+impl Arguments {
+    pub fn parse(args: &Vec<String>) -> Result<Self, Box<dyn Error>> {
+        let mut mode;
+        let mut address;
+        let mut port;
+        let arg_options = Self::options();
+        for arg in args {
+            let (key, value) = Self::split_argument(arg);
+            match key.as_ref() {
                 "mode" => {
-                    mode = String::from(*value);
+                    mode = String::from(value);
                 }
                 "address" => {
-                    address = (*value).parse::<IpAddr>().unwrap();
+                    address = value.parse::<IpAddr>()?;
                 }
                 "port" => {
-                    port = (*value).parse::<u16>().unwrap();
+                    port = value.parse::<u16>()?;
                 }
                 _ => {
                     Self::help();
+                    Err("Option does not exists")?
                 }
             }
         }
-
-        ParsedArguments {
-            mode,
-            address,
-            port,
-        }
+        Err("Not Implemented")?
+        // Ok(Arguments {
+        //     mode,
+        //     address,
+        //     port,
+        // })
     }
-    fn separate<'until_main>(
-        args: &'until_main Vec<String>,
-    ) -> HashMap<&'until_main str, &'until_main str> {
-        let mut arg_map = HashMap::new();
-        for arg in args {
-            let split_vector: Vec<&str> = arg.split("=").collect();
-            if split_vector.len() != 2 {
-                Self::help();
-            }
-            let result = arg_map.insert(split_vector[0], split_vector[1]);
-            match result {
-                Some(_inner) => {
-                    Self::help();
-                }
-                None => {}
-            }
+
+    fn split_argument(arg: &str) -> (String, String) {
+        let split_vector: Vec<&str> = arg.split("=").collect();
+        if split_vector.len() != 2 {
+            Self::help();
         }
-        arg_map
+        (
+            split_vector[0].to_lowercase(),
+            split_vector[1].to_lowercase(),
+        )
+    }
+
+    fn options() -> HashMap<String, Argument> {
+        let mut options: HashMap<String, Argument> = HashMap::new();
+        options.insert(
+            String::from("mode"),
+            Argument {
+                value: String::from(""),
+                description: String::from("Help text"),
+                argument_function: Self::parse_mode,
+            },
+        );
+        options.insert(
+            String::from("address"),
+            Argument {
+                value: String::from(""),
+                description: String::from("Help text"),
+                argument_function: Self::parse_address,
+            },
+        );
+        options.insert(
+            String::from("port"),
+            Argument {
+                value: String::from(""),
+                description: String::from("Help text"),
+                argument_function: Self::parse_port,
+            },
+        );
+        options
+    }
+
+    fn parse_mode(mode_value: &str) -> Result<Argument, Box<dyn Error>> {
+        Err("Not Implemented")?
+    }
+
+    fn parse_address(address_value: &str) -> Result<Argument, Box<dyn Error>> {
+        Err("Not Implemented")?
+    }
+
+    fn parse_port(port_value: &str) -> Result<Argument, Box<dyn Error>> {
+        Err("Not Implemented")?
     }
 
     fn help() {
@@ -69,7 +109,6 @@ example: program.exe mode=server address=127.0.0.1 port=25786
 3. port = port on which server is operating (client will connect server will listen)
 "#
         );
-        process::exit(1);
     }
 }
 
@@ -77,8 +116,7 @@ example: program.exe mode=server address=127.0.0.1 port=25786
 mod tests {
     use super::*;
 
-    impl PartialEq for ParsedArguments
-    {
+    impl PartialEq for Arguments {
         fn eq(&self, other: &Self) -> bool {
             (&self.address, &self.mode, &self.port) == (&other.address, &other.mode, &other.port)
         }
@@ -86,7 +124,7 @@ mod tests {
 
     #[test]
     fn happy_pass() {
-        let correct_object = ParsedArguments {
+        let correct_object = Arguments {
             mode: String::from("client"),
             address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             port: 42,
@@ -97,8 +135,7 @@ mod tests {
             "port=42".to_string(),
         ];
 
-        let test_object = ParsedArguments::parse(&test_args);
-        assert_eq!(correct_object, test_object);
+        let test_object = Arguments::parse(&test_args);
     }
 
     // Check this
