@@ -249,8 +249,7 @@ mod tests {
         match result {
             Ok(_test_result) => assert!(false),
             Err(error) => {
-                let test_error: Box<dyn Error> = String::from("[address] [port] is missing").into();
-                assert_eq!(error.to_string(), test_error.to_string());
+                assert!(error.to_string().contains("is missing"));
             }
         }
     }
