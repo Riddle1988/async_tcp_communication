@@ -1,7 +1,8 @@
-use async_std::net::{IpAddr};
+use async_std::net::IpAddr;
 use std::collections::HashMap;
 use std::error::Error;
 
+/// Containes all parsable data
 #[derive(Debug, PartialEq)]
 pub enum Arguments {
     Mode(String),
@@ -9,6 +10,7 @@ pub enum Arguments {
     Port(u16),
 }
 
+/// Containes help description and function pointer for every valid argument
 struct ValidArguments {
     description: String,
     argument_function: fn(&str) -> Result<Arguments, Box<dyn Error>>,
@@ -57,6 +59,21 @@ impl ValidArguments {
 }
 
 impl Arguments {
+    /// Parse arguments with predfind options and return,
+    /// a vector with parsed data wrapped in Arguments Enum
+    /// # Examples
+    ///
+    /// ```
+    /// let args: Vec<String> = env::args().skip(1).collect();
+    /// let arg = match Arguments::parse(&args) {
+    ///         Ok(arguments) => arguments,
+    ///         Err(error) => {
+    ///             println!("\nError while parsing arguments: {}", error);
+    ///             Arguments::help();
+    ///             process::exit(1);
+    ///         }
+    ///     };
+    /// ```
     pub fn parse(args: &Vec<String>) -> Result<Vec<Arguments>, Box<dyn Error>> {
         let mut arguments = Vec::new();
         let mut arg_options = ValidArguments::options();
@@ -69,11 +86,10 @@ impl Arguments {
         }
         if arguments.is_empty() {
             Err("No Arguments found")?
-        } else if !(arg_options.is_empty()){
+        } else if !(arg_options.is_empty()) {
             let unused_keys = Self::get_unset_arguments(&arg_options);
             Err(format!("{}is missing", unused_keys))?
-        }
-        else {
+        } else {
             Ok(arguments)
         }
     }
@@ -98,6 +114,20 @@ impl Arguments {
         result
     }
 
+    /// Prints help with example and current options.
+    /// Should be used after parsing fails
+    /// # Examples
+    ///
+    /// ```
+    /// let arg = match Arguments::parse(&args) {
+    ///         Ok(arguments) => arguments,
+    ///         Err(error) => {
+    ///             println!("\nError while parsing arguments: {}", error);
+    ///             Arguments::help();
+    ///             process::exit(1);
+    ///         }
+    ///     };
+    /// ```
     pub fn help() {
         let arg_options = ValidArguments::options();
         println!("Help:\nexample: program.exe mode=server address=127.0.0.1 port=25786");
@@ -144,14 +174,13 @@ mod tests {
 
     #[test]
     fn wrong_mode_argument() {
-        let test_args = vec![
-            "mode=this_is_wrong".to_string(),
-        ];
+        let test_args = vec!["mode=this_is_wrong".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
             Err(error) => {
-                let test_error: Box<dyn Error> = String::from("Wrong mode type try with client or server").into();
+                let test_error: Box<dyn Error> =
+                    String::from("Wrong mode type try with client or server").into();
                 assert_eq!(error.to_string(), test_error.to_string());
             }
         }
@@ -159,9 +188,7 @@ mod tests {
 
     #[test]
     fn wrong_address_argument() {
-        let test_args = vec![
-            "address=this_is_wrong".to_string(),
-        ];
+        let test_args = vec!["address=this_is_wrong".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
@@ -174,14 +201,13 @@ mod tests {
 
     #[test]
     fn wrong_port_argument() {
-        let test_args = vec![
-            "port=this_is_wrong".to_string(),
-        ];
+        let test_args = vec!["port=this_is_wrong".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
             Err(error) => {
-                let test_error: Box<dyn Error> = String::from("invalid digit found in string").into();
+                let test_error: Box<dyn Error> =
+                    String::from("invalid digit found in string").into();
                 assert_eq!(error.to_string(), test_error.to_string());
             }
         }
@@ -189,28 +215,26 @@ mod tests {
 
     #[test]
     fn no_separator() {
-        let test_args = vec![
-            "portthis_is_wrong".to_string(),
-        ];
+        let test_args = vec!["portthis_is_wrong".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
             Err(error) => {
-                let test_error: Box<dyn Error> = String::from("Argument must have exactly one `=` character").into();
+                let test_error: Box<dyn Error> =
+                    String::from("Argument must have exactly one `=` character").into();
                 assert_eq!(error.to_string(), test_error.to_string());
             }
         }
     }
     #[test]
     fn two_separators() {
-        let test_args = vec![
-            "por=tthis_i=s_wrong".to_string(),
-        ];
+        let test_args = vec!["por=tthis_i=s_wrong".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
             Err(error) => {
-                let test_error: Box<dyn Error> = String::from("Argument must have exactly one `=` character").into();
+                let test_error: Box<dyn Error> =
+                    String::from("Argument must have exactly one `=` character").into();
                 assert_eq!(error.to_string(), test_error.to_string());
             }
         }
@@ -228,23 +252,17 @@ mod tests {
                 match &test_result[0] {
                     Arguments::Mode(small_client) => {
                         assert_eq!(*small_client, String::from("client"))
-                    },
-                    _ => {
-                        assert!(false)
                     }
+                    _ => assert!(false),
                 };
-            },
-            Err(_error) => {
-                assert!(false)
             }
+            Err(_error) => assert!(false),
         }
     }
 
     #[test]
     fn to_few_arguments() {
-        let test_args = vec![
-            "mode=client".to_string(),
-        ];
+        let test_args = vec!["mode=client".to_string()];
         let result = Arguments::parse(&test_args);
         match result {
             Ok(_test_result) => assert!(false),
