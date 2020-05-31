@@ -59,17 +59,21 @@ impl ValidArguments {
 impl Arguments {
     pub fn parse(args: &Vec<String>) -> Result<Vec<Arguments>, Box<dyn Error>> {
         let mut arguments = Vec::new();
-        let arg_options = ValidArguments::options();
+        let mut arg_options = ValidArguments::options();
         for arg in args {
             let (key, value) = Self::split_argument(arg)?;
             if arg_options.contains_key(&key) {
-                let func = arg_options.get(&key).unwrap().argument_function;
+                let func = arg_options.remove(&key).unwrap().argument_function;
                 arguments.push(func(&value)?);
             }
         }
         if arguments.is_empty() {
             Err("No Arguments found")?
-        } else {
+        } else if !(arg_options.is_empty()){
+            let unused_keys = Self::get_unset_arguments(&arg_options);
+            Err(format!("{}is missing", unused_keys))?
+        }
+        else {
             Ok(arguments)
         }
     }
@@ -84,6 +88,14 @@ impl Arguments {
                 split_vector[1].to_lowercase(),
             ))
         }
+    }
+
+    fn get_unset_arguments(arg_options: &HashMap<String, ValidArguments>) -> String {
+        let mut result: String = String::from("");
+        for (key, _value) in arg_options.into_iter() {
+            result.push_str(format!("[{}] ", key).as_ref());
+        }
+        result
     }
 
     pub fn help() {
@@ -207,6 +219,8 @@ mod tests {
     fn lower_case_conversion() {
         let test_args = vec![
             "MODE=CLIENT".to_string(),
+            "ADDRESS=127.0.0.1".to_string(),
+            "PORT=42".to_string(),
         ];
         let result = Arguments::parse(&test_args);
         match result {
@@ -222,6 +236,21 @@ mod tests {
             },
             Err(_error) => {
                 assert!(false)
+            }
+        }
+    }
+
+    #[test]
+    fn to_few_arguments() {
+        let test_args = vec![
+            "mode=client".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("[address] [port] is missing").into();
+                assert_eq!(error.to_string(), test_error.to_string());
             }
         }
     }
