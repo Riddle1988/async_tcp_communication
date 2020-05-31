@@ -1,21 +1,18 @@
 mod command_line_parse;
-
+use std::process;
 use std::env;
 use command_line_parse::Arguments;
 
 
 fn main() {
     let args: Vec<String> = env::args().skip(1).collect();
-    let test = Arguments::parse(&args);
-    println!("{:?}", test);
-    // let mut args = env::args().skip(1).peekable(); // Iteratot that can look at the next element of the iterator without consuming it (as a reference)
-
-    // match args.peek().map(|x| x.as_ref()) {
-    //     Some("--option1") => {
-    //          args.next(); // Skip the flag
-    //     }
-    //     _ => {
-    //         println!("handle no option");
-    //     }
-    // }
+    let arg = match Arguments::parse(&args) {
+        Ok(arguments) => arguments,
+        Err(error) => {
+            println!("\nError while parsing arguments: {}", error);
+            Arguments::help();
+            process::exit(1);
+        }
+    };
+    println!("{:?}", arg);
 }

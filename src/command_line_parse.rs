@@ -1,125 +1,228 @@
-use async_std::net::{IpAddr, Ipv4Addr};
+use async_std::net::{IpAddr};
 use std::collections::HashMap;
 use std::error::Error;
 
-#[derive(Debug)]
-pub struct Arguments {
-    pub mode: String,
-    pub address: async_std::net::IpAddr,
-    pub port: u16,
+#[derive(Debug, PartialEq)]
+pub enum Arguments {
+    Mode(String),
+    Address(async_std::net::IpAddr),
+    Port(u16),
 }
 
-struct Argument {
+struct ValidArguments {
     description: String,
-    argument_function: fn(&str) -> Result<Argument, Box<dyn Error>>,
+    argument_function: fn(&str) -> Result<Arguments, Box<dyn Error>>,
 }
-
-impl Arguments {
-    pub fn parse(args: &Vec<String>) -> Result<Self, Box<dyn Error>> {
-        let mut arg_options = Self::options();
-        for arg in args {
-            let (key, value) = Self::split_argument(arg);
-            if arg_options.contains_key(&key) {
-                let func = arg_options.get(&key).unwrap().argument_function;
-                func(&value)?;
-            }
-        }
-        Err("Not Implemented")?
-        // Ok(Arguments {
-        //     mode,
-        //     address,
-        //     port,
-        // })
-    }
-
-    fn split_argument(arg: &str) -> (String, String) {
-        let split_vector: Vec<&str> = arg.split("=").collect();
-        if split_vector.len() != 2 {
-            Self::help();
-        }
-        (
-            split_vector[0].to_lowercase(),
-            split_vector[1].to_lowercase(),
-        )
-    }
-
-    fn options() -> HashMap<String, Argument> {
-        let mut options: HashMap<String, Argument> = HashMap::new();
+impl ValidArguments {
+    fn options() -> HashMap<String, ValidArguments> {
+        let mut options: HashMap<String, ValidArguments> = HashMap::new();
         options.insert(
             String::from("mode"),
-            Argument {
-                description: String::from("Help text"),
+            ValidArguments {
+                description: String::from("client or server mode available (e.g. mode=client"),
                 argument_function: Self::parse_mode,
             },
         );
         options.insert(
             String::from("address"),
-            Argument {
-                description: String::from("Help text"),
+            ValidArguments {
+                description: String::from("valid server ip address (e.g. address=127.0.0.1"),
                 argument_function: Self::parse_address,
             },
         );
         options.insert(
             String::from("port"),
-            Argument {
-                description: String::from("Help text"),
+            ValidArguments {
+                description: String::from("valid server port (e.g. port=25768"),
                 argument_function: Self::parse_port,
             },
         );
         options
     }
 
-    fn parse_mode(mode_value: &str) -> Result<Argument, Box<dyn Error>> {
-        Err("Not Implemented")?
+    fn parse_mode(mode_value: &str) -> Result<Arguments, Box<dyn Error>> {
+        match mode_value {
+            "client" | "server" => return Ok(Arguments::Mode(String::from(mode_value))),
+            _ => return Err("Wrong mode type try with client or server")?,
+        }
     }
 
-    fn parse_address(address_value: &str) -> Result<Argument, Box<dyn Error>> {
-        Err("Not Implemented")?
+    fn parse_address(address_value: &str) -> Result<Arguments, Box<dyn Error>> {
+        return Ok(Arguments::Address((*address_value).parse::<IpAddr>()?));
     }
 
-    fn parse_port(port_value: &str) -> Result<Argument, Box<dyn Error>> {
-        Err("Not Implemented")?
+    fn parse_port(port_value: &str) -> Result<Arguments, Box<dyn Error>> {
+        return Ok(Arguments::Port((*port_value).parse::<u16>()?));
+    }
+}
+
+impl Arguments {
+    pub fn parse(args: &Vec<String>) -> Result<Vec<Arguments>, Box<dyn Error>> {
+        let mut arguments = Vec::new();
+        let arg_options = ValidArguments::options();
+        for arg in args {
+            let (key, value) = Self::split_argument(arg)?;
+            if arg_options.contains_key(&key) {
+                let func = arg_options.get(&key).unwrap().argument_function;
+                arguments.push(func(&value)?);
+            }
+        }
+        if arguments.is_empty() {
+            Err("No Arguments found")?
+        } else {
+            Ok(arguments)
+        }
     }
 
-    fn help() {
-        println!(
-            r#"
-Help:
-example: program.exe mode=server address=127.0.0.1 port=25786
-1. mode = server or client
-2. address = ip address of server (client will try to connect server will open here)
-3. port = port on which server is operating (client will connect server will listen)
-"#
-        );
+    fn split_argument(arg: &str) -> Result<(String, String), Box<dyn Error>> {
+        let split_vector: Vec<&str> = arg.split("=").collect();
+        if split_vector.len() != 2 {
+            Err("Argument must have exactly one `=` character")?
+        } else {
+            Ok((
+                split_vector[0].to_lowercase(),
+                split_vector[1].to_lowercase(),
+            ))
+        }
+    }
+
+    pub fn help() {
+        let arg_options = ValidArguments::options();
+        println!("Help:\nexample: program.exe mode=server address=127.0.0.1 port=25786");
+        for (key, value) in arg_options {
+            println!("{}: {}", key, value.description);
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    impl PartialEq for Arguments {
-        fn eq(&self, other: &Self) -> bool {
-            (&self.address, &self.mode, &self.port) == (&other.address, &other.mode, &other.port)
-        }
-    }
+    use async_std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn happy_pass() {
-        let correct_object = Arguments {
-            mode: String::from("client"),
-            address: IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-            port: 42,
-        };
+        let correct_object = vec![
+            Arguments::Mode(String::from("client")),
+            Arguments::Address(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))),
+            Arguments::Port(42),
+        ];
         let test_args = vec![
             "mode=client".to_string(),
             "address=127.0.0.1".to_string(),
             "port=42".to_string(),
         ];
 
-        let test_object = Arguments::parse(&test_args);
+        let test_object = Arguments::parse(&test_args).unwrap();
+
+        assert_eq!(correct_object, test_object)
+    }
+    #[test]
+    fn without_arguments() {
+        let test_args: Vec<String> = Vec::new();
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("No Arguments found").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
     }
 
-    // Check this
-    // https://stackoverflow.com/questions/43390971/how-to-check-the-exit-code-from-stdprocessexit-in-tests
+    #[test]
+    fn wrong_mode_argument() {
+        let test_args = vec![
+            "mode=this_is_wrong".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("Wrong mode type try with client or server").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
+    }
+
+    #[test]
+    fn wrong_address_argument() {
+        let test_args = vec![
+            "address=this_is_wrong".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("invalid IP address syntax").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
+    }
+
+    #[test]
+    fn wrong_port_argument() {
+        let test_args = vec![
+            "port=this_is_wrong".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("invalid digit found in string").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
+    }
+
+    #[test]
+    fn no_separator() {
+        let test_args = vec![
+            "portthis_is_wrong".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("Argument must have exactly one `=` character").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
+    }
+    #[test]
+    fn two_separators() {
+        let test_args = vec![
+            "por=tthis_i=s_wrong".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(_test_result) => assert!(false),
+            Err(error) => {
+                let test_error: Box<dyn Error> = String::from("Argument must have exactly one `=` character").into();
+                assert_eq!(error.to_string(), test_error.to_string());
+            }
+        }
+    }
+    #[test]
+    fn lower_case_conversion() {
+        let test_args = vec![
+            "MODE=CLIENT".to_string(),
+        ];
+        let result = Arguments::parse(&test_args);
+        match result {
+            Ok(test_result) => {
+                match &test_result[0] {
+                    Arguments::Mode(small_client) => {
+                        assert_eq!(*small_client, String::from("client"))
+                    },
+                    _ => {
+                        assert!(false)
+                    }
+                };
+            },
+            Err(_error) => {
+                assert!(false)
+            }
+        }
+    }
 }
