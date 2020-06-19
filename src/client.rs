@@ -8,10 +8,48 @@ use async_std::{
     task,
 };
 
+#[path = "command_line_parse.rs"] mod command_line_parse;
+use crate::command_line_parse::Arguments;
+
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
-pub(crate) fn main() -> Result<()> {
-    task::block_on(try_main("127.0.0.1:8080"))
+pub(crate) fn main(args: &Vec<Arguments>) -> Result<()> {
+    let option_address = args
+    .iter()
+    .filter_map(|f| {
+        if let Arguments::Address(ref value) = *f {
+            Some(value)
+        } else {
+            None
+        }
+    })
+    .next()
+    .map(ToOwned::to_owned);
+    let address = match option_address {
+        Some(ip) => ip,
+        None => Err("Wrong address")?
+    };
+
+    let option_port = args
+    .iter()
+    .filter_map(|f| {
+        if let Arguments::Port(ref value) = *f {
+            Some(value)
+        } else {
+            None
+        }
+    })
+    .next()
+    .map(ToOwned::to_owned);
+    let port = match option_port {
+        Some(number) => number,
+        None => Err("Wrong port")?
+    };
+
+    let mut full_address = address.to_string();
+    full_address.push_str(":");
+    full_address.push_str(port.to_string().as_ref());
+    task::block_on(try_main(full_address))
 }
 
 async fn try_main(addr: impl ToSocketAddrs) -> Result<()> {
